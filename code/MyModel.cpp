@@ -129,9 +129,8 @@ void MyModel::calculate_mu()
 
 //        // I'm only interested in a specific region of the spectrum
 //        // right now, so let's only look at that!
-	const double& f_min = 0.25;
-//        const double& f_max = data.get_f_max();
-	const double f_max = 0.754;
+	const double& f_min = 0.50;
+	const double f_max = 0.68;
 
         for(size_t j=0; j<dopplershiftcomponents.size(); j++)
         {
@@ -140,7 +139,7 @@ void MyModel::calculate_mu()
 	
 			for (int i=0; i<nlines; i++)
 				{
-					line_pos_shifted[i] = line_pos[i]*(1. + dshift);
+					line_pos_shifted[i] = line_pos[i]*(1. - dshift);
 					amplitude[i] = exp(dopplershiftcomponents[j][i+1]);
 					//logq[i] = dopplershiftcomponents[j][i+1+nlines];
       					sign[i] = dopplershiftcomponents[j][i+1+2*nlines];		
@@ -226,7 +225,6 @@ void MyModel::from_prior(RNG& rng)
 
 	dopplershift.from_prior(rng);
 
-	// this, too belongs to the noise process we're not using 
         noise_sigma = exp(log(1E-3) + log(1E3)*rng.rand());
         noise_L = exp(log(0.1*Data::get_instance().get_f_range())
                         + log(1E2)*rng.rand());
@@ -312,8 +310,8 @@ double MyModel::log_likelihood() const
 	// I'm only interested in a specific region of the spectrum
 	// right now, so let's only look at that!
 
-        const double& f_min = 0.25;
-        const double& f_max = 0.754;
+        const double& f_min = 0.50;
+        const double f_max = 0.68;
 
         double logl = 0.;
 	    for(size_t i=0; i<y1.size(); i++)

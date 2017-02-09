@@ -316,7 +316,8 @@ def run_burst(filename, dnest_dir = "./", levelfilename=None, nsims=100):
         levelfile.write("%s \t %i \n" %(filename, nlevels))
         levelfile.close()
 
-    rewrite_options(nlevels=nlevels, dnest_dir=dnest_dir)
+    rewrite_options(nlevels=80, dnest_dir=dnest_dir)
+    #rewrite_options(nlevels=nlevels, dnest_dir=dnest_dir)
     remake_model(dnest_dir)
 
     dnest_process = subprocess.Popen(["./main", "-t", "8", "-d", fname])
