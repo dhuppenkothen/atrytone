@@ -215,7 +215,7 @@ void MyModel::calculate_mu()
 	  counts.size(), &counts[0],
 	  pha.rmf.offset);
 
-	mu.resize(data.get_pha().bin_lo.size());
+	counts.resize(data.get_pha().bin_lo.size());
 
 }
 
@@ -324,7 +324,7 @@ double MyModel::log_likelihood() const
                                 continue;
 			else
 				{
-					logl += -mu[i] + y1[i]*log(mu[i]) - gsl_sf_lngamma(y1[i] + 1.);
+					logl += -counts[i] + y1[i]*log(counts[i]) - gsl_sf_lngamma(y1[i] + 1.);
 				}
  		}
 	return logl;
