@@ -14,6 +14,8 @@ const int& nlines = Data::get_instance().get_nlines();
 //const std::vector<double> line_pos = Data::get_instance().get_line_pos();
 const PHAData& pha = Data::get_instance().get_pha();
 
+// Initialise the static distribution
+const DNest4::Cauchy MyModel::cauchy(0.0, 1.0);
 
 MyModel::MyModel()
 :dopplershift(3*nlines+1, 1, false, MyConditionalPrior())
@@ -150,9 +152,9 @@ void MyModel::calculate_mu()
 			int s=0;	
         	        for(size_t i=0; i<mu.size(); i++)
         	        {
-		                if (f_left[i] < f_min)                        
+		                if (f_left_h[i] < f_min)                        
 		                       continue;
-		                if (f_right[i] > f_max)
+		                if (f_right_h[i] > f_max)
 	        	               continue;
 	       		        else
 	                	{       
@@ -162,16 +164,17 @@ void MyModel::calculate_mu()
 						{
 						// Integral over the Lorentzian distribution
 						if (sign[k] < dopplershift.get_conditional_prior().get_pp()) 
-							s = -1;
+							sh = -1;
 						else 
-							s = 1;
-						if ((std::abs(f_right[i] - line_pos_shifted[k]) < 5.*width[k]) && 
-						   (std::abs(f_left[i] - line_pos_shifted[k]) < 5.*width[k])) 
-							mu[i] += s*amplitude[k]*(gaussian_cdf(f_right[i], line_pos_shifted[k], width[k])
-										- gaussian_cdf(f_left[i], line_pos_shifted[k], width[k]));
+							sh = 1;
+						if ((std::abs(f_right_h[i] - line_pos_shifted[k]) < 5.*width[k]) && 
+						   (std::abs(f_left_h[i] - line_pos_shifted[k]) < 5.*width[k])) 
+							mu[i] += sh*amplitude[k]*(gaussian_cdf(f_right_h[i], line_pos_shifted[k], width[k])
+										- gaussian_cdf(f_left_h[i], line_pos_shifted[k], width[k]));
 						}
                 		}	 
 			}
+
 	}
 
    
@@ -182,25 +185,31 @@ void MyModel::calculate_mu()
 			mu[ ii ] *= pha.arf.specresp[ ii ];
 
 		}
-
-        // Compute the OU process
-        vector<double> y(mu.size());
+        
+	vector<double> y(mu.size());
         double alpha = exp(-1./noise_L);
+
 
 	// noise process could come both from the source or the detector!
  	// which is why I put it in between the ARF and the RMF
 	for(size_t i=0; i<mu.size(); i++)
 	{
-		if (f_left[i] < f_min)
-			y[i]=1.0;
-		else if (f_right[i] > f_max)
-             		y[i]=1.0;
+                if(i == 0)
+                        y[i] = noise_sigma*noise_normals[i];
+                else
+                        y[i] = alpha*y[i-1] + noise_sigma*noise_normals[i];
 
-	        else if((f_left[i] < f_min) && (f_right[i] > f_min ))
-	                y[i] = noise_sigma/sqrt(1. - alpha*alpha)*noise_normals[i];
-	        else
-	                y[i] = alpha*y[i-1] + noise_sigma*noise_normals[i];
-	        mu[i] *= exp(y[i]);
+//              if (f_left_h[i] < f_min)
+//                      y_h[i]=0.0;
+//              else if (f_right_h[i] > f_max)
+//                      y_h[i]=0.0;
+
+//              else if((f_left_h[i] < f_min) && (f_right_h[i] > f_min ))
+//                      y_h[i] = noise_sigma/sqrt(1. - alpha*alpha)*noise_normals_h[i];
+//              else
+//                      y_h[i] = alpha*y_h[i-1] + noise_sigma*noise_normals_h[i];
+                mu[i] *= exp(y[i]);
+
 
 	}
 
@@ -221,15 +230,18 @@ void MyModel::calculate_mu()
 
 void MyModel::from_prior(RNG& rng)
 {
-	background = tan(M_PI*(0.97*rng.rand() - 0.485));
-	background = exp(background);
+    do
+    {
+    	background = cauchy.generate(rng);
+    }while(std::abs(background) > 25.0);
+    background = exp(background);
 
 	dopplershift.from_prior(rng);
 
 	// this, too belongs to the noise process we're not using 
         noise_sigma = exp(log(1E-3) + log(1E3)*rng.rand());
-        noise_L = exp(log(0.1*Data::get_instance().get_f_range())
-                        + log(1E2)*rng.rand());
+        noise_L = exp(log(0.01*Data::get_instance().get_f_range())
+                        + log(1000)*rng.rand());
 
         calculate_mu();
 
@@ -252,18 +264,34 @@ double MyModel::perturb(RNG& rng)
 		{
 			if(rng.rand() <= 0.5)	// Propose to move only one
 			{
-				which = rng.rand_int(noise_normals.size());
-				logH -= -0.5*pow(noise_normals[which], 2);
-				noise_normals[which] += rng.randh();
-				logH += -0.5*pow(noise_normals[which], 2);
+				int i = rng.rand_int(noise_normals_h.size());
+				logH -= -0.5*pow(noise_normals_h[i], 2);
+				noise_normals_h[i] += rng.randh();
+				logH += -0.5*pow(noise_normals_h[i], 2);
+
+                                i = rng.rand_int(noise_normals_m.size());
+                                logH -= -0.5*pow(noise_normals_m[i], 2);
+                                noise_normals_m[i] += rng.randh();
+                                logH += -0.5*pow(noise_normals_m[i], 2);
+
+
+
 			}
-			else					// AR(1) proposal
+			else					// Regenerate many
 			{
-				double theta = 2.*M_PI*pow(10., -6.*rng.rand());
-				double cos_theta = cos(theta);
-				double sin_theta = sin(theta);
-				for(double& n: noise_normals)
-					n = cos_theta*n + sin_theta*rng.randn();
+                int reps = (int)pow(noise_normals_h.size(), rng.rand());
+                for(int i=0; i<reps; ++i)
+                {
+                    int k = rng.rand_int(noise_normals_h.size());
+                    noise_normals_h[k] = rng.randn();
+                }
+
+                reps = (int)pow(noise_normals_m.size(), rng.rand());
+                for(int i=0; i<reps; ++i)
+                {
+                    int k = rng.rand_int(noise_normals_m.size());
+                    noise_normals_m[k] = rng.randn();
+                }
 			}
 		}
 	}
@@ -272,26 +300,27 @@ double MyModel::perturb(RNG& rng)
 		which = rng.rand_int(3);
 		if(which == 0)
 		{
-			background = log(background);
-			background = (atan(background)/M_PI + 0.485)/0.97;
-			background += rng.randh();
-			background = mod(background, 1.);
-			background = tan(M_PI*(0.97*background - 0.485));
-			background = exp(background);
+            		background = log(background);
+            		logH += cauchy.perturb(background, rng);
+            		if(std::abs(background) > 25.0)
+                		logH = -1E300;
+            		background = exp(background);
 		}
 
 		if(which == 1)
 		{
-			noise_sigma = log(noise_sigma);
-			noise_sigma += log(1E3)*rng.randh();
-			wrap(noise_sigma, log(1E-3), log(1.));
-			noise_sigma = exp(noise_sigma);
+                        noise_sigma = log(noise_sigma);
+                        logH += cauchy.perturb(noise_sigma, rng);
+                        if(noise_sigma < -20.0 || noise_sigma > 0.0)
+                                return -1E300;
+                        noise_sigma = exp(noise_sigma);
+
 		}
 		else
 		{
 			noise_L = log(noise_L);
-			noise_L += log(1E2)*rng.randh();
-			wrap(noise_L, log(0.1*Data::get_instance().get_f_range()), log(10.*Data::get_instance().get_f_range()));
+			noise_L += log(1E5)*rng.randh();
+			wrap(noise_L, log(0.01*Data::get_instance().get_f_range()), log(1000.*Data::get_instance().get_f_range()));
 			noise_L = exp(noise_L);
 		}
 	}
@@ -318,9 +347,9 @@ double MyModel::log_likelihood() const
         double logl = 0.;
 	    for(size_t i=0; i<y1.size(); i++)
 		{
-                        if (f_left[i] < f_min)
+                        if (f_left_h[i] < f_min)
                                 continue;
-                        if (f_right[i] > f_max)
+                        if (f_right_h[i] > f_max)
                                 continue;
 			else
 				{
@@ -328,16 +357,44 @@ double MyModel::log_likelihood() const
 				}
  		}
 	return logl;
+
 }
 
 void MyModel::print(std::ostream& out) const
 {
+
+        const vector<double>& f_left = pha.bin_lo;
+        const vector<double>& f_right = pha.bin_hi;
+
+        // I'm only interested in a specific region of the spectrum
+        // right now, so let's only look at that!
+
+        const double& f_min = 0.25;
+        const double& f_max = 0.754;
+
         out<<background<<' '<<noise_L<<' '<<noise_sigma<<' ';
         dopplershift.print(out);
 
 	for(size_t i=0; i<mu.size(); i++)
-		out<<mu[i]<<' ';
-  
+		{
+                if (f_left_h[i] < f_min)
+                                continue;
+                if (f_right_h[i] > f_max)
+                                continue;
+                else
+			out<<mu[i]<<' ';
+ 		}
+
+        for(size_t i=0; i<counts.size(); i++)
+                {
+                if (f_left_h[i] < f_min)
+                                continue;
+                if (f_right_h[i] > f_max)
+                                continue;
+                else
+                        out<<counts[i]<<' ';
+                }
+
 }
 
 string MyModel::description() const

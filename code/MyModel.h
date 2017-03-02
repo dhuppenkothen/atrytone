@@ -5,6 +5,7 @@
 #include "MyConditionalPrior.h"
 #include <ostream>
 #include "Data.h"
+#include "DNest4/code/Distributions/Cauchy.h"
 #include "DNest4/code/RJObject/RJObject.h"
 #include <vector>
 #include <stdexcept>
@@ -17,13 +18,17 @@ class MyModel
 		// Reference to the data
 		static const Data& data;
 
+        // A useful cauchy distribution
+        static const DNest4::Cauchy cauchy;
+
 		// A flat background level
 		double background;
 
 		// The Lorentzians
 		DNest4::RJObject<MyConditionalPrior> dopplershift;
 		// Extra white noise on the flux
-		std::vector<double> noise_normals;
+		std::vector<double> noise_normals_h;
+
 		double noise_sigma, noise_L;
 
 		// Poisson mean
