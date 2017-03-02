@@ -131,8 +131,8 @@ void MyModel::calculate_mu()
 
 //        // I'm only interested in a specific region of the spectrum
 //        // right now, so let's only look at that!
-	const double& f_min = 0.50;
-	const double f_max = 0.68;
+	const double& f_min = data.get_f_min();
+	const double& f_max = data.get_f_max();
 
         for(size_t j=0; j<dopplershiftcomponents.size(); j++)
         {
@@ -151,9 +151,9 @@ void MyModel::calculate_mu()
 			int s=0;	
         	        for(size_t i=0; i<mu.size(); i++)
         	        {
-		                if (f_left_h[i] < f_min)                        
+		                if (f_left[i] < f_min)                        
 		                       continue;
-		                if (f_right_h[i] > f_max)
+		                if (f_right[i] > f_max)
 	        	               continue;
 	       		        else
 	                	{       
@@ -163,13 +163,13 @@ void MyModel::calculate_mu()
 						{
 						// Integral over the Lorentzian distribution
 						if (sign[k] < dopplershift.get_conditional_prior().get_pp()) 
-							sh = -1;
+							s = -1;
 						else 
-							sh = 1;
-						if ((std::abs(f_right_h[i] - line_pos_shifted[k]) < 5.*width[k]) && 
-						   (std::abs(f_left_h[i] - line_pos_shifted[k]) < 5.*width[k])) 
-							mu[i] += sh*amplitude[k]*(gaussian_cdf(f_right_h[i], line_pos_shifted[k], width[k])
-										- gaussian_cdf(f_left_h[i], line_pos_shifted[k], width[k]));
+							s = 1;
+						if ((std::abs(f_right[i] - line_pos_shifted[k]) < 5.*width[k]) && 
+						   (std::abs(f_left[i] - line_pos_shifted[k]) < 5.*width[k])) 
+							mu[i] += s*amplitude[k]*(gaussian_cdf(f_right[i], line_pos_shifted[k], width[k])
+										- gaussian_cdf(f_left[i], line_pos_shifted[k], width[k]));
 						}
                 		}	 
 			}
@@ -184,10 +184,12 @@ void MyModel::calculate_mu()
 			mu[ ii ] *= pha.arf.specresp[ ii ];
 
 		}
-        
+
 	vector<double> y(mu.size());
         double alpha = exp(-1./noise_L);
 
+
+	const double& f_range = data.get_f_range();
 
 	// noise process could come both from the source or the detector!
  	// which is why I put it in between the ARF and the RMF
@@ -198,10 +200,10 @@ void MyModel::calculate_mu()
                 else
                         y[i] = alpha*y[i-1] + noise_sigma*noise_normals[i];
 
-//              if (f_left_h[i] < f_min)
-//                      y_h[i]=0.0;
-//              else if (f_right_h[i] > f_max)
-//                      y_h[i]=0.0;
+              if (f_left[i] < f_min)
+                      y[i-1]=0.0;
+              else if (f_right[i+1] > f_max)
+                      y[i]=0.0;
 
 //              else if((f_left_h[i] < f_min) && (f_right_h[i] > f_min ))
 //                      y_h[i] = noise_sigma/sqrt(1. - alpha*alpha)*noise_normals_h[i];
@@ -262,34 +264,23 @@ double MyModel::perturb(RNG& rng)
 		{
 			if(rng.rand() <= 0.5)	// Propose to move only one
 			{
-				int i = rng.rand_int(noise_normals_h.size());
-				logH -= -0.5*pow(noise_normals_h[i], 2);
-				noise_normals_h[i] += rng.randh();
-				logH += -0.5*pow(noise_normals_h[i], 2);
-
-                                i = rng.rand_int(noise_normals_m.size());
-                                logH -= -0.5*pow(noise_normals_m[i], 2);
-                                noise_normals_m[i] += rng.randh();
-                                logH += -0.5*pow(noise_normals_m[i], 2);
+				int i = rng.rand_int(noise_normals.size());
+				logH -= -0.5*pow(noise_normals[i], 2);
+				noise_normals[i] += rng.randh();
+				logH += -0.5*pow(noise_normals[i], 2);
 
 
 
 			}
 			else					// Regenerate many
 			{
-                int reps = (int)pow(noise_normals_h.size(), rng.rand());
+                int reps = (int)pow(noise_normals.size(), rng.rand());
                 for(int i=0; i<reps; ++i)
                 {
-                    int k = rng.rand_int(noise_normals_h.size());
-                    noise_normals_h[k] = rng.randn();
+                    int k = rng.rand_int(noise_normals.size());
+                    noise_normals[k] = rng.randn();
                 }
 
-                reps = (int)pow(noise_normals_m.size(), rng.rand());
-                for(int i=0; i<reps; ++i)
-                {
-                    int k = rng.rand_int(noise_normals_m.size());
-                    noise_normals_m[k] = rng.randn();
-                }
 			}
 		}
 	}
@@ -339,15 +330,15 @@ double MyModel::log_likelihood() const
 	// I'm only interested in a specific region of the spectrum
 	// right now, so let's only look at that!
 
-        const double& f_min = 0.50;
-        const double f_max = 0.68;
+        const double& f_min = data.get_f_min();
+        const double& f_max = data.get_f_max();
 
         double logl = 0.;
 	    for(size_t i=0; i<y1.size(); i++)
 		{
-                        if (f_left_h[i] < f_min)
+                        if (f_left[i] < f_min)
                                 continue;
-                        if (f_right_h[i] > f_max)
+                        if (f_right[i] > f_max)
                                 continue;
 			else
 				{
@@ -367,17 +358,17 @@ void MyModel::print(std::ostream& out) const
         // I'm only interested in a specific region of the spectrum
         // right now, so let's only look at that!
 
-        const double& f_min = 0.25;
-        const double& f_max = 0.754;
+	const double& f_min = data.get_f_min();
+        const double& f_max = data.get_f_max();
 
         out<<background<<' '<<noise_L<<' '<<noise_sigma<<' ';
         dopplershift.print(out);
 
 	for(size_t i=0; i<mu.size(); i++)
 		{
-                if (f_left_h[i] < f_min)
+                if (f_left[i] < f_min)
                                 continue;
-                if (f_right_h[i] > f_max)
+                if (f_right[i] > f_max)
                                 continue;
                 else
 			out<<mu[i]<<' ';
@@ -385,9 +376,9 @@ void MyModel::print(std::ostream& out) const
 
         for(size_t i=0; i<counts.size(); i++)
                 {
-                if (f_left_h[i] < f_min)
+                if (f_left[i] < f_min)
                                 continue;
-                if (f_right_h[i] > f_max)
+                if (f_right[i] > f_max)
                                 continue;
                 else
                         out<<counts[i]<<' ';

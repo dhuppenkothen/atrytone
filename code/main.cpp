@@ -12,9 +12,9 @@ int main(int argc, char** argv)
 	CommandLineOptions options(argc, argv);
  
         //char datadir[50];
-        //strcpy(datadir, "../data/cyg_daniela/");
 	std::string datadir = "../data/";
 
+	cout<<"File name from command line: "<<options.get_data_file().c_str()<<endl;
 	// get the data filename from the command line
 	Data::get_instance().load_data(datadir.c_str(), options.get_data_file().c_str());
 

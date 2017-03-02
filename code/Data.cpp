@@ -26,6 +26,7 @@ Data::Data()
 void Data::load_data(const char* datadir, const char* filename)
 {
   pha = load_fits(datadir, filename);
+  compute_summaries();
 
 }
 
@@ -36,6 +37,7 @@ PHAData Data::load_fits(const char* datadir, const char* filename)
   strcat(whole_file, filename);
   strcpy(pha.filename, whole_file);
 
+  cout<<"File to read from: "<<pha.filename<<endl;
   CCfits::FITS::setVerboseMode(true);
 
   // Open file for reading
@@ -51,18 +53,6 @@ PHAData Data::load_fits(const char* datadir, const char* filename)
   CCfits::Column& column2 = spectrum.column("COUNTS");
   column2.read(pha.counts, 1, column2.rows());
 
-  //CCfits::Column& column3 = spectrum.column("BIN_LO");
-  //column3.read(pha.bin_lo, 1, column3.rows());
- 
-  //CCfits::Column& column4 = spectrum.column("BIN_HI");
-  //column4.read(pha.bin_hi, 1, column4.rows());
-
-  //vector<double> bin_mid(pha.bin_lo.size(), 0.0);
-
-  // compute the middle of the energy bins
-  //for(size_t i=0; i<pha.bin_lo.size(); i++){
-  //   bin_mid[i] = pha.bin_lo[i] + (pha.bin_hi[i] - pha.bin_lo[i])/2.0;
-  //}
 
   //pha.bin_mid = bin_mid;
 
@@ -71,10 +61,10 @@ PHAData Data::load_fits(const char* datadir, const char* filename)
   spectrum.readKey("RESPFILE", respfile);
   spectrum.readKey("ANCRFILE", ancrfile);
 
-  string eunit_lo, eunit_hi;
+  //string eunit_lo, eunit_hi;
 
-  eunit_lo = column3.unit();
-  eunit_hi = column4.unit();
+  //eunit_lo = column3.unit();
+  //eunit_hi = column4.unit();
 
   //cout<<"# Unit of the energy bins: "<<eunit_lo<<"."<<endl;
 
@@ -317,68 +307,59 @@ void Data::load_lines(const char* filename)
 }
 
 
-void Data::load(const char* filename)
-{
-
-        double conv = 12.3984191;
-
-	fstream fin(filename, ios::in);
-	if(!fin)
-	{
-		cerr<<"# Failed to open file "<<filename<<"."<<endl;
-		exit(1);
-	}
-
-	f_left.clear();
-	f_right.clear();
-	y.clear();
-	yerr.clear();
-
-	double temp1, temp2, temp3, temp4;
-	while(fin>>temp1 && fin>>temp2 && fin>>temp3 && fin>>temp4)
-	{
-		f_left.push_back(temp1);
-		f_right.push_back(temp2);
-		y.push_back(temp3);
-		yerr.push_back(temp4);
-	}
-
-	fin.close();
-	cout<<"# Found "<<f_left.size()<<" points in file "<<filename<<"."<<endl;
-
-	compute_summaries();
-}
-
+//void Data::load(const char* filename)
+//{
+//
+//        double conv = 12.3984191;
+//
+//	fstream fin(filename, ios::in);
+//	if(!fin)
+//	{
+//		cerr<<"# Failed to open file "<<filename<<"."<<endl;
+//		exit(1);
+//	}
+//
+//	f_left.clear();
+//	f_right.clear();
+//	y.clear();
+//	yerr.clear();
+//
+//	double temp1, temp2, temp3, temp4;
+//	while(fin>>temp1 && fin>>temp2 && fin>>temp3 && fin>>temp4)
+//	{
+//		f_left.push_back(temp1);
+//		f_right.push_back(temp2);
+//		y.push_back(temp3);
+//		yerr.push_back(temp4);
+//	}
+//
+//	fin.close();
+//	cout<<"# Found "<<f_left.size()<<" points in file "<<filename<<"."<<endl;
+//
+//	compute_summaries();
+//}
+//
 
 void Data::compute_summaries()
 {
 
 	// ASSUME DATA IS IN KEV!!
-	
-	//const double l_min = lines[0];
-	//const double l_max = lines[lines.size()-1];
-
-	//const double dmin = -0.01;
-	//const double dmax = 0.01;
-
-	f_min = 6.0499997575723086;
-	f_max = 7.100000097785645;
-	//f_min = l_min/(1. + dmax) - 0.01;
-	//f_max = l_max/(1 + dmin) - 0.01;
+	f_min = 0.50;
+	f_max = 0.68;	
 	f_range = f_max - f_min;
 
 	cout<<"Total energy range covered: "<<f_range<<"."<<endl;
 
 	// Left and right edges of the data bins
-	f_mid.assign(f_left.size(), 0.);
-	df.assign(f_left.size(), 0.);
-	for(size_t i=0; i<f_left.size(); i++)
-	{
-		df[i] = f_right[i] - f_left[i];
-		f_mid[i] = f_left[i] + 0.5*df[i];
-	}
-
-	min_df = *min_element(df.begin(), df.end());
+//	f_mid.assign(f_left.size(), 0.);
+//	df.assign(f_left.size(), 0.);
+//	for(size_t i=0; i<f_left.size(); i++)
+//	{
+//		df[i] = f_right[i] - f_left[i];
+//		f_mid[i] = f_left[i] + 0.5*df[i];
+//	}
+//
+//	min_df = *min_element(df.begin(), df.end());
 }
 
 
