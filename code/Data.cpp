@@ -350,16 +350,18 @@ void Data::compute_summaries()
 
 	cout<<"Total energy range covered: "<<f_range<<"."<<endl;
 
+	f_left = pha.bin_lo;
+	f_right = pha.bin_hi;
 	// Left and right edges of the data bins
 //	f_mid.assign(f_left.size(), 0.);
-//	df.assign(f_left.size(), 0.);
-//	for(size_t i=0; i<f_left.size(); i++)
-//	{
-//		df[i] = f_right[i] - f_left[i];
+	df.assign(f_left.size(), 0.);
+	for(size_t i=0; i<f_left.size(); i++)
+	{
+		df[i] = f_right[i] - f_left[i];
 //		f_mid[i] = f_left[i] + 0.5*df[i];
-//	}
-//
-//	min_df = *min_element(df.begin(), df.end());
+	}
+
+	min_df = *min_element(df.begin(), df.end());
 }
 
 
