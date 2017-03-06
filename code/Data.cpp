@@ -278,7 +278,7 @@ ARFData Data::load_arf(const char* datadir, const char* filename)
 
 void Data::load_lines(const char* filename)
 {
-	double conv = 12.3984191;
+//	double conv = 12.3984191;
 
 	fstream fin(filename, ios::in);
 	if(!fin)

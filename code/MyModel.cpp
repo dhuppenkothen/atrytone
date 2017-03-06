@@ -105,6 +105,7 @@ void MyModel::rmf_fold(IndexType len_source, const ConstFloatType *source,
 
 void MyModel::calculate_mu()
 { 
+
 	// define line positions
 	const vector<double>& line_pos = data.get_line_pos();
 
@@ -176,7 +177,6 @@ void MyModel::calculate_mu()
 
 	}
 
-   
         // fold through the ARF
         // code taken from sherpa
         for (size_t ii = 0; ii < mu.size(); ii++ )
@@ -185,11 +185,9 @@ void MyModel::calculate_mu()
 
 		}
 
+
 	vector<double> y(mu.size());
         double alpha = exp(-1./noise_L);
-
-
-	const double& f_range = data.get_f_range();
 
 	// noise process could come both from the source or the detector!
  	// which is why I put it in between the ARF and the RMF
@@ -200,9 +198,9 @@ void MyModel::calculate_mu()
                 else
                         y[i] = alpha*y[i-1] + noise_sigma*noise_normals[i];
 
-              if (f_left[i] < f_min)
+              if ((f_left[i] < f_min) & (i > 0))
                       y[i-1]=0.0;
-              else if (f_right[i+1] > f_max)
+              else if (f_right[i] > f_max)
                       y[i]=0.0;
 
 //              else if((f_left_h[i] < f_min) && (f_right_h[i] > f_min ))
@@ -216,7 +214,6 @@ void MyModel::calculate_mu()
 
         counts.assign(mu.size(), 0.0);
 
-
         rmf_fold(mu.size(), &mu[0], 
 	  pha.rmf.n_grp.size(), &pha.rmf.n_grp[0],
 	  pha.rmf.f_chan.size(), &pha.rmf.f_chan[0],
@@ -225,8 +222,7 @@ void MyModel::calculate_mu()
 	  counts.size(), &counts[0],
 	  pha.rmf.offset);
 
-	counts.resize(data.get_pha().bin_lo.size());
-
+	counts.resize(f_left.size());
 }
 
 void MyModel::from_prior(RNG& rng)
