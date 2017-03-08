@@ -14,9 +14,8 @@ int main(int argc, char** argv)
         //char datadir[50];
 	std::string datadir = "../data/";
 
-	cout<<"File name from command line: "<<options.get_data_file().c_str()<<endl;
 	// get the data filename from the command line
-	Data::get_instance().load_data(datadir.c_str(), options.get_data_file().c_str());
+	Data::get_instance().load_data(datadir.c_str(), "../data/03.pha");;
 
         cout<<"Loaded FITS files with data ..."<<endl;
 
@@ -37,8 +36,6 @@ int main(int argc, char** argv)
  
 	// sample!
 	Sampler<MyModel> sampler = setup<MyModel>(options);
-  
-//        cout<<"Set up sampler ..."<<endl;
 
 	sampler.run();
 	return 0;

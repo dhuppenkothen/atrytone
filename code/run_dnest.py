@@ -16,7 +16,7 @@ def rewrite_main(filename, dnest_dir = "./"):
     mfile.close()
 
     ## replace filename in appropriate line:
-    mdata[-6] = '\tData::get_instance().load("%s");\n'%filename
+    mdata[17] = '\tData::get_instance().load_data(datadir.c_str(), "%s");;\n'%filename
 
     mfile.close()
 
@@ -32,7 +32,7 @@ def rewrite_main(filename, dnest_dir = "./"):
     return
 
 
-def rewrite_options(nlevels=1000, dnest_dir="./"):
+def rewrite_options(nlevels=150, dnest_dir="./"):
 
     mfile = open(dnest_dir+"OPTIONS", "r")
     mdata = mfile.readlines()
@@ -270,7 +270,7 @@ def run_burst(filename, dnest_dir = "./", levelfilename=None, nsims=100,
     print("First run of DNest: Find number of levels")
     print("I am running on %i cores."%ncores)
     ## run DNest
-    dnest_process = subprocess.Popen(["./main", "-t", "%i"%ncores])
+    dnest_process = subprocess.Popen(["nice", "-19", "./main", "-t", "%i"%ncores])
 
     endflag = False
     while endflag is False:
@@ -287,6 +287,8 @@ def run_burst(filename, dnest_dir = "./", levelfilename=None, nsims=100,
                     endflag = find_weights(p_samples)
                     print("Endflag: " + str(endflag))
 
+            #TEMPORARY
+            endflag=True
 
         except KeyboardInterrupt:
             break
@@ -309,7 +311,7 @@ def run_burst(filename, dnest_dir = "./", levelfilename=None, nsims=100,
     rewrite_options(nlevels=nlevels, dnest_dir=dnest_dir)
     remake_model(dnest_dir)
 
-    dnest_process = subprocess.Popen(["./main", "-t", "%i"%ncores])
+    dnest_process = subprocess.Popen(["nice", "-19", "./main", "-t", "%i"%ncores])
 
     endflag = False
     while endflag is False:
@@ -340,6 +342,10 @@ def run_burst(filename, dnest_dir = "./", levelfilename=None, nsims=100,
 
                 else:
                     endflag = False
+
+            #TEMPORARY
+            endflag = True
+
         except KeyboardInterrupt:
             break
 
@@ -425,7 +431,7 @@ if __name__ == "__main__":
                              "run.")
 
     parser.add_argument("--min-levels", action="store", required=False,
-                        dest="min_levels", default=200, type=int,
+                        dest="min_levels", default=20, type=int,
                         help="The minimum number of levels to run.")
 
     clargs = parser.parse_args()
