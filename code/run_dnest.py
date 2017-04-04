@@ -8,6 +8,7 @@ import glob
 import argparse
 
 from dnest4.classic import logsumexp, logdiffexp
+import dnest4
 
 def rewrite_main(filename, dnest_dir = "./"):
 
@@ -248,10 +249,9 @@ def run_burst(filename, dnest_dir = "./", levelfilename=None, nsims=100,
     ### first run: set levels to 200
     print("Rewriting DNest run file")
     rewrite_main(filename, dnest_dir)
-    # rewrite_options(nlevels=1000, dnest_dir=dnest_dir)
-    rewrite_options(nlevels=1000, dnest_dir=dnest_dir)
-    remake_model(dnest_dir)
-
+#    rewrite_options(nlevels=1000, dnest_dir=dnest_dir)
+#    remake_model(dnest_dir)
+#
     fdir = filename.split("/")
     fname = fdir[-1]
     fdir = filename[:-len(fname)]
@@ -261,49 +261,52 @@ def run_burst(filename, dnest_dir = "./", levelfilename=None, nsims=100,
     fsplit = fname.split(".")
     froot = "%s%s" %(fdir, fsplit[0])
     print("froot: " + str(froot))
+#
+#
+#    ### printing DNest display script
+#    rewrite_display(filename, dnest_dir)
+#
+#
+#    print("First run of DNest: Find number of levels")
+#    print("I am running on %i cores."%ncores)
+#    ## run DNest
+#    dnest_process = subprocess.Popen(["nice", "-19", "./main", "-t", "%i"%ncores])
+#
+#    endflag = False
+#    while endflag is False:
+#        try:
+#            tsys.sleep(120)
+#            levels = np.loadtxt("%slevels.txt" %dnest_dir)
+#            if len(levels)-1 <= min_levels:
+#                endflag = False
+#            else:
+#                logx_samples, p_samples = postprocess_new(save_posterior=False)
+#                if p_samples is None:
+#                    endflag = False
+#                else:
+#                    endflag = find_weights(p_samples)
+#                    print("Endflag: " + str(endflag))
+#
+#        except KeyboardInterrupt:
+#            break
+#
+#
+#    print("endflag: " + str(endflag))
+#
+#    dnest_process.kill()
+#    dnest_data = np.loadtxt("%slevels.txt" %dnest_dir)
+#    nlevels = len(dnest_data)+20
+#
+#    nsamples = len(np.loadtxt("%ssample.txt"%dnest_dir))
+#
+#    ### save levels to file
+#    if not levelfilename is None:
+#        levelfile = open(levelfilename, "a")
+#        levelfile.write("%s \t %i \n" %(filename, nlevels))
+#        levelfile.close()
+#
 
-
-    ### printing DNest display script
-    rewrite_display(filename, dnest_dir)
-
-
-    print("First run of DNest: Find number of levels")
-    print("I am running on %i cores."%ncores)
-    ## run DNest
-    dnest_process = subprocess.Popen(["nice", "-19", "./main", "-t", "%i"%ncores])
-
-    endflag = False
-    while endflag is False:
-        try:
-            tsys.sleep(120)
-            levels = np.loadtxt("%slevels.txt" %dnest_dir)
-            if len(levels)-1 <= min_levels:
-                endflag = False
-            else:
-                logx_samples, p_samples = postprocess_new(save_posterior=False)
-                if p_samples is None:
-                    endflag = False
-                else:
-                    endflag = find_weights(p_samples)
-                    print("Endflag: " + str(endflag))
-
-        except KeyboardInterrupt:
-            break
-
-
-    print("endflag: " + str(endflag))
-
-    dnest_process.kill()
-    dnest_data = np.loadtxt("%slevels.txt" %dnest_dir)
-    nlevels = len(dnest_data)+100
-
-    nsamples = len(np.loadtxt("%ssample.txt"%dnest_dir))
-
-    ### save levels to file
-    if not levelfilename is None:
-        levelfile = open(levelfilename, "a")
-        levelfile.write("%s \t %i \n" %(filename, nlevels))
-        levelfile.close()
+    nlevels = 350
 
     rewrite_options(nlevels=nlevels, dnest_dir=dnest_dir)
     remake_model(dnest_dir)
@@ -314,31 +317,32 @@ def run_burst(filename, dnest_dir = "./", levelfilename=None, nsims=100,
     while endflag is False:
         try:
             tsys.sleep(120)
-            logx_samples, p_samples = postprocess_new(save_posterior=True)
+            #logx_samples, p_samples = postprocess_new(save_posterior=True)
+            _, _, _ = dnest4.postprocess(cut=0.8, plot=False)
             post_samples = np.loadtxt("%sposterior_sample.txt"%dnest_dir)
             print("samples file: %ssample.txt" %dnest_dir)
             print("Endflag: " + str(endflag))
             if len(post_samples) >= nsims and len(np.shape(post_samples)) > 1:
                 endflag = True
+#            else:
+#                if len(post_samples) <= 10 or len(np.shape(post_samples)) == 1:
+#                    print("I have made it here!")
+#                    levels = np.loadtxt("%slevels.txt" % dnest_dir)
+#                    raw_samples = len(np.loadtxt("%ssample.txt" % dnest_dir))
+#
+#                    if len(levels) >= nlevels-1 and raw_samples > nsamples+1000:
+#                        print("I have almost made it to the right spot!")
+#                        endflag = True
+#                        broken_file = "%sfailed.txt"%data_dir
+#                        if os.path.exists(broken_file):
+#                            append_write = 'a'  # append if already exists
+#                        else:
+#                            append_write = 'w'  # make a new file if not
+#                        with open(broken_file, append_write) as f:
+#                            f.write(filename + "\n")
+#
             else:
-                if len(post_samples) <= 10 or len(np.shape(post_samples)) == 1:
-                    print("I have made it here!")
-                    levels = np.loadtxt("%slevels.txt" % dnest_dir)
-                    raw_samples = len(np.loadtxt("%ssample.txt" % dnest_dir))
-
-                    if len(levels) >= nlevels-1 and raw_samples > nsamples+1000:
-                        print("I have almost made it to the right spot!")
-                        endflag = True
-                        broken_file = "%sfailed.txt"%data_dir
-                        if os.path.exists(broken_file):
-                            append_write = 'a'  # append if already exists
-                        else:
-                            append_write = 'w'  # make a new file if not
-                        with open(broken_file, append_write) as f:
-                            f.write(filename + "\n")
-
-                else:
-                    endflag = False
+                endflag = False
 
         except KeyboardInterrupt:
             break
@@ -346,8 +350,9 @@ def run_burst(filename, dnest_dir = "./", levelfilename=None, nsims=100,
     print("Endflag: " + str(endflag))
 
     dnest_process.kill()
-     
-    logx_samples, p_samples = postprocess_new(save_posterior=True)    
+    
+    #logx_samples, p_samples = postprocess_new(save_posterior=True)    
+    _, _, _ = dnest4.postprocess(cut=0.8, plot=False)
 
     print("froot: " + str(froot))
 
