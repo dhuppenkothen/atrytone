@@ -1,4 +1,4 @@
-
+import os
 import shutil
 import subprocess
 import time as tsys
@@ -7,7 +7,7 @@ import copy
 import glob
 import argparse
 
-import dnest4
+from dnest4.classic import logsumexp, logdiffexp
 
 def rewrite_main(filename, dnest_dir = "./"):
 
@@ -16,7 +16,7 @@ def rewrite_main(filename, dnest_dir = "./"):
     mfile.close()
 
     ## replace filename in appropriate line:
-    mdata[-6] = '\tData::get_instance().load("%s");\n'%filename
+    mdata[17] = '\tData::get_instance().load_data(datadir.c_str(), "%s");;\n'%filename
 
     mfile.close()
 
@@ -32,13 +32,15 @@ def rewrite_main(filename, dnest_dir = "./"):
     return
 
 
-def rewrite_options(nlevels=200, dnest_dir="./"):
+def rewrite_options(nlevels=150, dnest_dir="./"):
 
     mfile = open(dnest_dir+"OPTIONS", "r")
     mdata = mfile.readlines()
     mfile.close()
 
+    print(mdata[6])
     mdata[6] = '%i\t# maximum number of levels\n'%nlevels
+    print(mdata[6])
 
     mwrite_file = open(dnest_dir+"OPTIONS.tmp", "w")
 
@@ -86,19 +88,17 @@ def extract_nlevels(filename):
 
     fsplit = filename.split("_")
 
-    sdata = np.loadtxt("%s_%s_levels.txt"%(fsplit[0], fsplit[1]))
-
-    print(sdata.shape)
+    sdata = np.loadtxt("%s_%s_samples.txt"%(fsplit[0], fsplit[1]))
 
     nlevels = np.shape(sdata)[0]
-    
 
     return nlevels
 
 
 
 
-def postprocess_new(temperature=1., numResampleLogX=1, plot=False, save_posterior=False):
+def postprocess_new(temperature=1., numResampleLogX=1, plot=False,
+                    save_posterior=False):
 
     cut = 0
 
@@ -119,8 +119,11 @@ def postprocess_new(temperature=1., numResampleLogX=1, plot=False, save_posterio
         sample_info = sample_info[0:lowest, :]
 
     # Convert to lists of tuples
-    logl_levels = [(levels[i,1], levels[i, 2]) for i in range(0, levels.shape[0])] # logl, tiebreaker
-    logl_samples = [(sample_info[i, 1], sample_info[i, 2], i) for i in range(0, sample.shape[0])] # logl, tiebreaker, id
+    logl_levels = [(levels[i,1], levels[i, 2]) for i in range(0,
+                                                              levels.shape[0])] # logl, tiebreaker
+    logl_samples = [(sample_info[i, 1], sample_info[i, 2], i) for
+                    i in range(0, sample.shape[0])] # logl, tiebreaker, id
+
     logx_samples = np.zeros((sample_info.shape[0], numResampleLogX))
     logp_samples = np.zeros((sample_info.shape[0], numResampleLogX))
     logP_samples = np.zeros((sample_info.shape[0], numResampleLogX))
@@ -131,7 +134,8 @@ def postprocess_new(temperature=1., numResampleLogX=1, plot=False, save_posterio
     # Find sandwiching level for each sample
     sandwich = sample_info[:,0].copy().astype('int')
     for i in range(0, sample.shape[0]):
-        while sandwich[i] < levels.shape[0]-1 and logl_samples[i] > logl_levels[sandwich[i] + 1]:
+        while sandwich[i] < levels.shape[0]-1 and \
+                        logl_samples[i] > logl_levels[sandwich[i] + 1]:
             sandwich[i] += 1
 
 
@@ -161,7 +165,8 @@ def postprocess_new(temperature=1., numResampleLogX=1, plot=False, save_posterio
             logx_samples_thisLevel = np.sort(logx_max + np.log(U))[::-1]
 
             for j in range(0, which.size):
-                logx_samples[logl_samples_thisLevel[j][2]][z] = logx_samples_thisLevel[j]
+                logx_samples[logl_samples_thisLevel[j][2]][z] = \
+                    logx_samples_thisLevel[j]
 
                 if j != which.size - 1:
                     left = logx_samples_thisLevel[j+1]
@@ -174,22 +179,16 @@ def postprocess_new(temperature=1., numResampleLogX=1, plot=False, save_posterio
                     right = logx_samples_thisLevel[j-1]
                 else:
                     right = levels[i][0]
-                try:
-                    logp_samples[logl_samples_thisLevel[j][2]][z] = np.log(0.5) + dnest4.classic.logdiffexp(right, left)
-                except AttributeError:
-                    logp_samples[logl_samples_thisLevel[j][2]][z] = np.log(0.5) + dnest4.logdiffexp(right, left)
 
+                logp_samples[logl_samples_thisLevel[j][2]][z] = \
+                    np.log(0.5) + logdiffexp(right, left)
 
         logl = sample_info[:,1]/temperature
-        try:
-             logp_samples[:,z] = logp_samples[:,z] - dnest4.classic.logsumexp(logp_samples[:,z])
-             logP_samples[:,z] = logp_samples[:,z] + logl
-             logz_estimates[z] = dnest4.classic.logsumexp(logP_samples[:,z])
-        except AttributeError:
-             logp_samples[:,z] = logp_samples[:,z] - dnest4.logsumexp(logp_samples[:,z])
-             logP_samples[:,z] = logp_samples[:,z] + logl
-             logz_estimates[z] = dnest4.logsumexp(logP_samples[:,z])
 
+        logp_samples[:,z] = logp_samples[:,z] - \
+                            logsumexp(logp_samples[:,z])
+        logP_samples[:,z] = logp_samples[:,z] + logl
+        logz_estimates[z] = logsumexp(logP_samples[:,z])
         logP_samples[:,z] -= logz_estimates[z]
         P_samples[:,z] = np.exp(logP_samples[:,z])
         H_estimates[z] = -logz_estimates[z] + np.sum(P_samples[:,z]*logl)
@@ -205,7 +204,8 @@ def postprocess_new(temperature=1., numResampleLogX=1, plot=False, save_posterio
         ESS = np.exp(-np.sum(P_samples*np.log(P_samples+1E-300)))
 
         print("log(Z) = " + str(logz_estimate) + " +- " + str(logz_error))
-        print("Information = " + str(H_estimate) + " +- " + str(H_error) + " nats.")
+        print("Information = " + str(H_estimate) + " +- " +
+              str(H_error) + " nats.")
         print("Effective sample size = " + str(ESS))
 
         # Resample to uniform weight
@@ -229,8 +229,9 @@ def find_weights(p_samples):
 
     print("max(p_samples): %f" %np.max(p_samples[-10:]))
 
-    ### NOTE: logx_samples runs from 0 to -120, but I'm interested in the values of p_samples near the
-    ### smallest values of X, so I need to look at the end of the list
+    # NOTE: logx_samples runs from 0 to -120, but I'm interested
+    # in the values of p_samples near the
+    # smallest values of X, so I need to look at the end of the list
     if np.max(p_samples[-10:]) < 1.0e-5:
         print("Returning True")
         return True
@@ -239,33 +240,16 @@ def find_weights(p_samples):
         return False
 
 
-def run_burst(filename, dnest_dir = "./", levelfilename=None, nsims=100):
+def run_burst(filename, dnest_dir = "./", levelfilename=None, nsims=100,
+              ncores=8, min_levels=100):
 
-    print("filename: " + str(filename))
-    #times, counts = burstmodel.read_gbm_lightcurves(filename)
-    #data = np.loadtxt(filename)
-    #times = data[:,0]
-    #y = data[:,1]
-    #yerr = data[:,2]
-
-    #dt = times[1] - times[0]
-
-    #dt_wanted = 0.0005
-
-
-    #if dt < dt_wanted:
-    #    dt_new = int(dt_wanted/dt)
-    #    assert dt_wanted/dt >1, "New time resolution smaller than old one! This is wrong!"
-    #    bintimes, bincounts = burstmodel.rebin_lightcurve(times, counts, dt_new, type="sum")
-
-    #    np.savetxt("%s_new.dat"%(filename[:-4]), np.array(zip(bintimes, bincounts)))
-
-    #    filename = "%s_new.dat"%(filename[:-4])
+    assert isinstance(ncores, int), "Number of cores must be an integer number!"
 
     ### first run: set levels to 200
-    #print("Rewriting DNest run file")
-    #rewrite_main(filename, dnest_dir)
-    rewrite_options(nlevels=200, dnest_dir=dnest_dir)
+    print("Rewriting DNest run file")
+    rewrite_main(filename, dnest_dir)
+    # rewrite_options(nlevels=1000, dnest_dir=dnest_dir)
+    rewrite_options(nlevels=1000, dnest_dir=dnest_dir)
     remake_model(dnest_dir)
 
     fdir = filename.split("/")
@@ -273,8 +257,9 @@ def run_burst(filename, dnest_dir = "./", levelfilename=None, nsims=100):
     fdir = filename[:-len(fname)]
     print("directory: %s" %fdir)
     print("filename: %s" %fname)
-    
-    froot = "%s/%s" %(fdir, fname)
+
+    fsplit = fname.split(".")
+    froot = "%s%s" %(fdir, fsplit[0])
     print("froot: " + str(froot))
 
 
@@ -283,31 +268,24 @@ def run_burst(filename, dnest_dir = "./", levelfilename=None, nsims=100):
 
 
     print("First run of DNest: Find number of levels")
+    print("I am running on %i cores."%ncores)
     ## run DNest
-    dnest_process = subprocess.Popen(["./main", "-t", "8", "-d", fname])
-
-
+    dnest_process = subprocess.Popen(["nice", "-19", "./main", "-t", "%i"%ncores])
 
     endflag = False
     while endflag is False:
-        #logz_all = []
         try:
-            tsys.sleep(60)
-            logx_samples, p_samples = postprocess_new(save_posterior=False)
-            #logz_all.append(logz_estimate)
-            if p_samples is None:
+            tsys.sleep(120)
+            levels = np.loadtxt("%slevels.txt" %dnest_dir)
+            if len(levels)-1 <= min_levels:
                 endflag = False
             else:
-#                if len(logz_all) > 1:
-#                    diff_logz = logz_estimate - logz_all[-2]
-#                    if diff_logz < 1.0:
-#                         endflag = True
-#                    else:
-#                         endflag = False
-#                else:
-#                    endflag = False
-                endflag = find_weights(p_samples)
-                print("Endflag: " + str(endflag))
+                logx_samples, p_samples = postprocess_new(save_posterior=False)
+                if p_samples is None:
+                    endflag = False
+                else:
+                    endflag = find_weights(p_samples)
+                    print("Endflag: " + str(endflag))
 
         except KeyboardInterrupt:
             break
@@ -316,9 +294,10 @@ def run_burst(filename, dnest_dir = "./", levelfilename=None, nsims=100):
     print("endflag: " + str(endflag))
 
     dnest_process.kill()
-    level_data = np.loadtxt("%slevels.txt" %dnest_dir)
-    nlevels = level_data.shape[0]
+    dnest_data = np.loadtxt("%slevels.txt" %dnest_dir)
+    nlevels = len(dnest_data)+100
 
+    nsamples = len(np.loadtxt("%ssample.txt"%dnest_dir))
 
     ### save levels to file
     if not levelfilename is None:
@@ -326,28 +305,41 @@ def run_burst(filename, dnest_dir = "./", levelfilename=None, nsims=100):
         levelfile.write("%s \t %i \n" %(filename, nlevels))
         levelfile.close()
 
-    ### BEWARE: I'VE JUST ARTIFICIALLY FIXED THE NUMBER OF LEVELS!!
-    rewrite_options(nlevels=80, dnest_dir=dnest_dir)
-#    rewrite_options(nlevels=nlevels, dnest_dir=dnest_dir)
+    rewrite_options(nlevels=nlevels, dnest_dir=dnest_dir)
     remake_model(dnest_dir)
 
-    dnest_process = subprocess.Popen(["./main", "-t", "8", "-d", fname])
+    dnest_process = subprocess.Popen(["nice", "-19", "./main", "-t", "%i"%ncores])
 
     endflag = False
     while endflag is False:
         try:
             tsys.sleep(120)
             logx_samples, p_samples = postprocess_new(save_posterior=True)
-            samples = np.loadtxt("%sposterior_sample.txt"%dnest_dir)
+            post_samples = np.loadtxt("%sposterior_sample.txt"%dnest_dir)
             print("samples file: %ssample.txt" %dnest_dir)
-            print("nlevels: %i" %len(samples)) 
             print("Endflag: " + str(endflag))
-
-            if len(samples) >= nsims and len(np.shape(samples)) > 1:
-            #if len(samples) >= np.max([5*nlevels, 1000+nlevels]) and len(np.shape(samples)) > 1:
+            if len(post_samples) >= nsims and len(np.shape(post_samples)) > 1:
                 endflag = True
             else:
-                endflag = False
+                if len(post_samples) <= 10 or len(np.shape(post_samples)) == 1:
+                    print("I have made it here!")
+                    levels = np.loadtxt("%slevels.txt" % dnest_dir)
+                    raw_samples = len(np.loadtxt("%ssample.txt" % dnest_dir))
+
+                    if len(levels) >= nlevels-1 and raw_samples > nsamples+1000:
+                        print("I have almost made it to the right spot!")
+                        endflag = True
+                        broken_file = "%sfailed.txt"%data_dir
+                        if os.path.exists(broken_file):
+                            append_write = 'a'  # append if already exists
+                        else:
+                            append_write = 'w'  # make a new file if not
+                        with open(broken_file, append_write) as f:
+                            f.write(filename + "\n")
+
+                else:
+                    endflag = False
+
         except KeyboardInterrupt:
             break
 
@@ -357,8 +349,6 @@ def run_burst(filename, dnest_dir = "./", levelfilename=None, nsims=100):
      
     logx_samples, p_samples = postprocess_new(save_posterior=True)    
 
-    #fsplit = filename.split("_")
-    #froot = "%s_%s" %(fsplit[0], fsplit[1])
     print("froot: " + str(froot))
 
     shutil.move("sample.txt", "%s_sample.txt" %froot)
@@ -373,10 +363,11 @@ def run_burst(filename, dnest_dir = "./", levelfilename=None, nsims=100):
     return
 
 
-def run_all_bursts(namestr, data_dir="./", dnest_dir="./", levelfilename="test_levels.dat"):
+def run_all_bursts(data_dir="./", dnest_dir="./", levelfilename="test_levels.dat",
+                   ncores=8, nsims=100, match_string="*.csv", min_levels=10):
 
     print("I am in run_all_bursts")
-    filenames = glob.glob("%s%s"%(data_dir, namestr))
+    filenames = glob.glob("%s%s"%(data_dir, match_string))
     print(filenames)
 
     levelfilename = data_dir+levelfilename
@@ -388,35 +379,63 @@ def run_all_bursts(namestr, data_dir="./", dnest_dir="./", levelfilename="test_l
 
     for f in filenames:
         print("Running on burst %s" %f)
-        run_burst(f, dnest_dir=dnest_dir, levelfilename=levelfilename)
+        run_burst(f, dnest_dir=dnest_dir, levelfilename=levelfilename,
+                  ncores=ncores, nsims=nsims, min_levels=min_levels)
 
     return
 
 
 def main():
     print("I am in main")
-    run_all_bursts(namestr, data_dir, dnest_dir, levelfilename)
+    run_all_bursts(data_dir, dnest_dir, levelfilename, ncores=ncores,
+                   nsims=nsamples, match_string=match_string,
+                   min_levels=min_levels)
     return
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Running DNest on a number of bursts")
+    parser = argparse.ArgumentParser(description="Running DNest on a number "
+                                                 "of bursts")
 
-    parser.add_argument("-s", "--namestr", action="store", required=True, dest="namestr",
-                        help="Specify file root of data files to run.")
+    parser.add_argument("-d", "--datadir", action="store", required=False,
+                        dest="data_dir",
+                        default="./", help="Specify directory with data "
+                                           "files (default: current directory)")
+    parser.add_argument("-n", "--dnestdir", action="store", required=False,
+                        dest="dnest_dir", default="./",
+                        help="Specify directory with DNest model "
+                             "implementation (default: current directory")
 
-    parser.add_argument("-d", "--datadir", action="store", required=False, dest="data_dir",
-                        default="./", help="Specify directory with data files (default: current directory)")
-    parser.add_argument("-n", "--dnestdir", action="store", required=False, dest="dnest_dir",
-                        default="./", help="Specify directory with DNest model implementation "
-                                           "(default: current directory")
-    parser.add_argument("-f", "--filename", action="store", required=False, dest="filename",
-                        default="test_levels.dat", help="Define filename for file that saves the number of levels to use")
+    parser.add_argument("-f", "--filename", action="store", required=False,
+                        dest="filename", default="test_levels.dat",
+                        help="Define filename for file that saves the number "
+                             "of levels to use")
+
+    parser.add_argument("-c", "--cores", action="store", required=False, type=int,
+                        dest="ncores", default=8, help="Number of cores "
+                                                       "DNest4 should use.")
+
+    parser.add_argument("--samples", action="store", required=False, type=int,
+                        dest="nsamples", default=100, help="Numer of posterior "
+                                                        "samples to store.")
+
+    parser.add_argument("-s", "--string", action="store", required=False,
+                        dest="match_string", default="*.csv",
+                        help="The string to use to search for data files to "
+                             "run.")
+
+    parser.add_argument("--min-levels", action="store", required=False,
+                        dest="min_levels", default=20, type=int,
+                        help="The minimum number of levels to run.")
 
     clargs = parser.parse_args()
-    namestr =  clargs.namestr
+
     data_dir = clargs.data_dir
     dnest_dir = clargs.dnest_dir
     levelfilename = clargs.filename
+    ncores = clargs.ncores
+    match_string = clargs.match_string
+    nsamples = clargs.nsamples
+    min_levels = clargs.min_levels
 
     main()
