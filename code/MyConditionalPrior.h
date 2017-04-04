@@ -8,8 +8,8 @@ class MyConditionalPrior:public DNest4::ConditionalPrior
 	private:
 
 		// Mean of amplitudes and widths
-		double mu_loga, sigma_loga, mu_logwidth, sigma_logwidth;
-		double pp;
+		double mu_loga, sigma_loga, mu_width, sigma_width;
+//		double pp;
 
 		static const double dmin, dmax;
 
@@ -27,7 +27,7 @@ class MyConditionalPrior:public DNest4::ConditionalPrior
 		void print(std::ostream& out) const;
 
 		// A getter
-		double get_pp() const { return pp; }
+//		double get_pp() const { return pp; }
 
 		static const int weight_parameter = 1;
 

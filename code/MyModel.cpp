@@ -18,7 +18,7 @@ const PHAData& pha = Data::get_instance().get_pha();
 const DNest4::Cauchy MyModel::cauchy(0.0, 1.0);
 
 MyModel::MyModel()
-:dopplershift(3*nlines+1, 1, false, MyConditionalPrior())
+:dopplershift(2*nlines+1, 1, false, MyConditionalPrior())
 ,noise_normals(pha.bin_lo.size())
 ,mu(pha.counts.size())
 {
@@ -145,8 +145,8 @@ void MyModel::calculate_mu()
 					line_pos_shifted[i] = line_pos[i]*(1. - dshift);
 					amplitude[i] = exp(dopplershiftcomponents[j][i+1]);
 					//logq[i] = dopplershiftcomponents[j][i+1+nlines];
-      					sign[i] = dopplershiftcomponents[j][i+1+2*nlines];		
-					width[i] = exp(dopplershiftcomponents[j][i+1+nlines]);
+//      					sign[i] = dopplershiftcomponents[j][i+1+2*nlines];		
+					width[i] = dopplershiftcomponents[j][i+1+nlines];
 				}
 		
 			int s=0;	
@@ -163,10 +163,11 @@ void MyModel::calculate_mu()
 					for (int k=0; k<nlines; k++)
 						{
 						// Integral over the Lorentzian distribution
-						if (sign[k] < dopplershift.get_conditional_prior().get_pp()) 
-							s = -1;
-						else 
-							s = 1;
+//						if (sign[k] < dopplershift.get_conditional_prior().get_pp()) 
+//							s = -1;
+//						else 
+//							s = 1;
+						s = -1;
 						if ((std::abs(f_right[i] - line_pos_shifted[k]) < 5.*width[k]) && 
 						   (std::abs(f_left[i] - line_pos_shifted[k]) < 5.*width[k])) 
 							mu[i] += s*amplitude[k]*(gaussian_cdf(f_right[i], line_pos_shifted[k], width[k])
@@ -198,17 +199,12 @@ void MyModel::calculate_mu()
                 else
                         y[i] = alpha*y[i-1] + noise_sigma*noise_normals[i];
 
-              if ((f_left[i] < f_min) & (i > 0))
-                      y[i-1]=0.0;
-              else if (f_right[i] > f_max)
-                      y[i]=0.0;
+              //if ((f_left[i] < f_min) & (i > 0))
+              //        y[i-1]=0.0;
+              //else if (f_right[i] > f_max)
+              //        y[i]=0.0;
 
-//              else if((f_left_h[i] < f_min) && (f_right_h[i] > f_min ))
-//                      y_h[i] = noise_sigma/sqrt(1. - alpha*alpha)*noise_normals_h[i];
-//              else
-//                      y_h[i] = alpha*y_h[i-1] + noise_sigma*noise_normals_h[i];
                 mu[i] *= exp(y[i]);
-
 
 	}
 
