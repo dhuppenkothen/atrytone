@@ -21,10 +21,11 @@ class MyModel
         // A useful cauchy distribution
         static const DNest4::Cauchy cauchy;
 
-		// A flat background level
+		// Normalization and slope of the power law background
 		double background;
+		double slope;
 
-		// The Lorentzians
+		// The Gaussian line profiless
 		DNest4::RJObject<MyConditionalPrior> dopplershift;
 		// Extra white noise on the flux
 		std::vector<double> noise_normals;
@@ -35,6 +36,7 @@ class MyModel
 		// these should probably be long doubles
 		// need to fix that some time!
 		std::vector<double> mu;
+		std::vector<double> mu_bkg;
                 std::vector<double> counts;
 
 //		std::vector<double> mu_small;

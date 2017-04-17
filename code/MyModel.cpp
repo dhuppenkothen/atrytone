@@ -120,9 +120,11 @@ void MyModel::calculate_mu()
 
 	const vector<double>& f_left = pha.bin_lo;
 	const vector<double>& f_right = pha.bin_hi;
+	const vector<double>& f_mid = pha.bin_mid;
 
 	// assign constant background to model
-	mu.assign(mu.size(), background);
+	mu.assign(mu.size(), 0.0);
+	mu_bkg.assign(mu.size(), 0.0);
 
 	// get amplitudes and widths from the RJObject 
 	const vector< vector<double> >& dopplershiftcomponents = dopplershift.get_components();
@@ -142,23 +144,23 @@ void MyModel::calculate_mu()
 	
 			for (int i=0; i<nlines; i++)
 				{
-					line_pos_shifted[i] = line_pos[i]*((1./(1. + dshift));
+					line_pos_shifted[i] = line_pos[i] * (1./(1. + dshift));
 					amplitude[i] = exp(dopplershiftcomponents[j][i+1]);
 					//logq[i] = dopplershiftcomponents[j][i+1+nlines];
 //      					sign[i] = dopplershiftcomponents[j][i+1+2*nlines];		
 					width[i] = dopplershiftcomponents[j][i+1+nlines];
 				}
-		
-			int s=0;	
+	
         	        for(size_t i=0; i<mu.size(); i++)
         	        {
+	                        mu_bkg[i] = exp(slope*log(f_mid[i]) + log(background));
+
 		                if (f_left[i] < f_min)                        
 		                       continue;
 		                if (f_right[i] > f_max)
 	        	               continue;
 	       		        else
 	                	{       
-
 
 					for (int k=0; k<nlines; k++)
 						{
@@ -167,7 +169,7 @@ void MyModel::calculate_mu()
 //							s = -1;
 //						else 
 //							s = 1;
-						s = -1;
+						int s = -1;
 						if ((std::abs(f_right[i] - line_pos_shifted[k]) < 5.*width[k]) && 
 						   (std::abs(f_left[i] - line_pos_shifted[k]) < 5.*width[k])) 
 							mu[i] += s*amplitude[k]*(gaussian_cdf(f_right[i], line_pos_shifted[k], width[k])
@@ -182,7 +184,7 @@ void MyModel::calculate_mu()
         // code taken from sherpa
         for (size_t ii = 0; ii < mu.size(); ii++ )
 		{
-			mu[ ii ] *= pha.arf.specresp[ ii ];
+			mu[ ii ] = (mu[ ii] + mu_bkg[ ii ]) * pha.arf.specresp[ ii ];
 
 		}
 
@@ -228,6 +230,8 @@ void MyModel::from_prior(RNG& rng)
     	background = cauchy.generate(rng);
     }while(std::abs(background) > 25.0);
     background = exp(background);
+
+        slope = -3.0 + 6.0 * rng.rand();
 
 	dopplershift.from_prior(rng);
 
@@ -278,7 +282,7 @@ double MyModel::perturb(RNG& rng)
 	}
 	else
 	{
-		which = rng.rand_int(3);
+		which = rng.rand_int(4);
 		if(which == 0)
 		{
             		background = log(background);
@@ -288,7 +292,13 @@ double MyModel::perturb(RNG& rng)
             		background = exp(background);
 		}
 
-		if(which == 1)
+                else if(which == 1)
+                        {
+                        slope += 6.*rng.randh();
+                        wrap(slope, -3., 3.);
+                        }
+
+		else if(which == 2)
 		{
                         noise_sigma = log(noise_sigma);
                         logH += cauchy.perturb(noise_sigma, rng);
@@ -343,6 +353,7 @@ double MyModel::log_likelihood() const
 
 void MyModel::print(std::ostream& out) const
 {
+        out.precision(25);
 
         const vector<double>& f_left = pha.bin_lo;
         const vector<double>& f_right = pha.bin_hi;
@@ -353,7 +364,7 @@ void MyModel::print(std::ostream& out) const
 	const double& f_min = data.get_f_min();
         const double& f_max = data.get_f_max();
 
-        out<<background<<' '<<noise_L<<' '<<noise_sigma<<' ';
+        out<<background<<' '<<slope<<' '<<noise_L<<' '<<noise_sigma<<' ';
         dopplershift.print(out);
 
 	for(size_t i=0; i<mu.size(); i++)
