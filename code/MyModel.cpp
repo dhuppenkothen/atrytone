@@ -112,15 +112,11 @@ void MyModel::calculate_mu()
 	// declare shifted line positions
 	vector<double> line_pos_shifted(line_pos.size());
 
-        // NEW VERSION: get PHA data from FITS file:
-        // doesn't do anything yet, just testing whether I can load the data!
-	// NOTE: Just having this line in the code (uncommented, of course), makes
-	// the code slower by at least a factor of 3! Not sure why that is, but I 
-	// should probably figure that out
-
 	const vector<double>& f_left = pha.bin_lo;
 	const vector<double>& f_right = pha.bin_hi;
 	const vector<double>& f_mid = pha.bin_mid;
+
+	//cout<<"f_mid: "<<f_mid<<endl;
 
 	// assign constant background to model
 	mu.assign(mu.size(), 0.0);
@@ -137,6 +133,20 @@ void MyModel::calculate_mu()
 	const double& f_min = data.get_f_min();
 	const double& f_max = data.get_f_max();
 
+//	// extra lines!
+//	vector<double> e_line_pos;
+//	e_line_pos.assign(3, 0.0);
+//	e_line_pos[0] = 0.28325;
+//	e_line_pos[1] = 0.28625;
+//	e_line_pos[2] = 0.5270;
+//
+//
+//        vector<double> e_line_sign;
+//        e_line_sign.assign(3, 0.0);
+//        e_line_sign[0] = -1. ;
+//        e_line_sign[1] = 1.;
+//        e_line_sign[2] = -1.;
+//
         for(size_t j=0; j<dopplershiftcomponents.size(); j++)
         {
 
@@ -153,8 +163,6 @@ void MyModel::calculate_mu()
 	
         	        for(size_t i=0; i<mu.size(); i++)
         	        {
-	                        mu_bkg[i] = exp(slope*log(f_mid[i]) + log(background));
-
 		                if (f_left[i] < f_min)                        
 		                       continue;
 		                if (f_right[i] > f_max)
@@ -183,8 +191,22 @@ void MyModel::calculate_mu()
         // fold through the ARF
         // code taken from sherpa
         for (size_t ii = 0; ii < mu.size(); ii++ )
-		{
-			mu[ ii ] = (mu[ ii] + mu_bkg[ ii ]) * pha.arf.specresp[ ii ];
+		{ 
+			// power law background
+                        mu_bkg[ ii ] = exp(log(background/(slope + 1.)) + log(f_right[ ii ]) * (slope + 1.))
+                                                 - exp(log(background/(slope + 1.)) + log(f_left[ ii ]) * (slope + 1.));
+
+
+//			for (size_t jj = 0; jj< e_line_pos.size(); jj++)
+//				{
+//			// extra interstellar line
+//			// this is a fudge until I can actually include proper physics models
+//                        	mu_bkg[ ii ] += e_line_sign[ jj ] * e_amp[ jj ]*(gaussian_cdf(f_right[ ii ], e_line_pos[ jj ], e_width[ jj ])
+//                                	            - gaussian_cdf(f_left[ ii ], e_line_pos[ jj ], e_width[ jj ]));
+//                      		}
+			// add Doppler-shifted lines to background, exponentiate and multiply by 
+			// spectral response
+			mu[ ii ] = exp(mu[ ii ] + log(mu_bkg[ ii ])) * pha.arf.specresp[ ii ];
 
 		}
 
@@ -225,21 +247,44 @@ void MyModel::calculate_mu()
 
 void MyModel::from_prior(RNG& rng)
 {
-    do
-    {
-    	background = cauchy.generate(rng);
-    }while(std::abs(background) > 25.0);
-    background = exp(background);
+	do
+	{
+		background = cauchy.generate(rng);
+	}while(std::abs(background) > 25.0);
+	background = exp(background);
+	
+//        e_amp.assign(3, 0.0);
 
-        slope = -3.0 + 6.0 * rng.rand();
-
+//	for (size_t j=0; j < e_amp.size(); j++)
+//	{
+//		do
+//		{
+//	    	e_amp[j] = cauchy.generate(rng);
+//		}while(std::abs(e_amp[j]) > 25.0);
+//		e_amp[j] = exp(e_amp[j]);
+//	}
+//
+//        e_width.assign(3, 0.0);
+//
+//        for (size_t j=0; j < e_width.size(); j++)
+//        {
+//                do
+//                {
+//                e_width[j] = cauchy.generate(rng);
+//                }while(std::abs(e_width[j]) > 25.0);
+//                e_width[j] = exp(e_width[j]);
+//        }
+//
+//
+	slope = -2.0 + 4.0 * rng.rand();
+	
 	dopplershift.from_prior(rng);
 
-        noise_sigma = exp(log(1E-3) + log(1E3)*rng.rand());
-        noise_L = exp(log(0.01*Data::get_instance().get_f_range())
+	noise_sigma = exp(log(1E-3) + log(1E3)*rng.rand());
+	noise_L = exp(log(0.01*Data::get_instance().get_f_range())
                         + log(1000)*rng.rand());
 
-        calculate_mu();
+	calculate_mu();
 
 }
 
@@ -291,6 +336,32 @@ double MyModel::perturb(RNG& rng)
                 		logH = -1E300;
             		background = exp(background);
 		}
+
+//                if(which == 1)
+//                {
+//			for (size_t j=0; j < e_amp.size(); j++)
+//			{
+//                        	e_amp[j] = log(e_amp[j]);
+//                        	logH += cauchy.perturb(e_amp[j], rng);
+//                       	 	if(std::abs(e_amp[j]) > 25.0)
+//                         	       logH = -1E300;
+//                        	e_amp[j] = exp(e_amp[j]);
+//				}	
+//
+//                }
+//
+//                if(which == 2)
+//                {
+//			for (size_t j=0; j<e_width.size(); j++)
+//			{
+//                        	e_width[j] = log(e_width[j]);
+//                        	logH += cauchy.perturb(e_width[j], rng);
+//                        	if(std::abs(e_width[j]) > 25.0)
+//                                	logH = -1E300;
+//                       	 	e_width[j] = exp(e_width[j]);
+//                	}
+//		}
+//
 
                 else if(which == 1)
                         {
@@ -364,8 +435,17 @@ void MyModel::print(std::ostream& out) const
 	const double& f_min = data.get_f_min();
         const double& f_max = data.get_f_max();
 
-        out<<background<<' '<<slope<<' '<<noise_L<<' '<<noise_sigma<<' ';
-        dopplershift.print(out);
+        out<<background<<' '<<slope<<' ';
+//	for (size_t j=0; j< e_amp.size(); j++)
+//		out<<e_amp[j]<<' ';
+//
+//        for (size_t j=0; j< e_amp.size(); j++)
+//		out<<e_width[j]<<' ';
+
+
+	out<<noise_L<<' '<<noise_sigma<<' ';
+        
+	dopplershift.print(out);
 
 	for(size_t i=0; i<mu.size(); i++)
 		{

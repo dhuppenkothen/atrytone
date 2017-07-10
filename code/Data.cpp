@@ -96,14 +96,15 @@ PHAData Data::load_fits(const char* datadir, const char* filename)
 
   vector<double> bin_mid(pha.arf.energ_lo.size(), 0.0);
 
-  // compute the middle of the energy bins
-  for(size_t i=0; i<pha.bin_lo.size(); i++){
-     bin_mid[i] = pha.arf.energ_lo[i] + (pha.arf.energ_hi[i] - pha.arf.energ_lo[i])/2.0;
-  }
+
   pha.bin_lo = pha.arf.energ_lo;
   pha.bin_hi = pha.arf.energ_hi;
-  pha.bin_mid = bin_mid;
 
+  // compute the middle of the energy bins
+  for(size_t i=0; i<pha.arf.energ_lo.size(); i++){
+     bin_mid[i] = pha.arf.energ_lo[i] + (pha.arf.energ_hi[i] - pha.arf.energ_lo[i])/2.0;
+  }
+  pha.bin_mid = bin_mid;
 
   return pha;
 
@@ -353,12 +354,12 @@ void Data::compute_summaries()
 	f_left = pha.bin_lo;
 	f_right = pha.bin_hi;
 	// Left and right edges of the data bins
-//	f_mid.assign(f_left.size(), 0.);
+	f_mid.assign(f_left.size(), 0.);
 	df.assign(f_left.size(), 0.);
 	for(size_t i=0; i<f_left.size(); i++)
 	{
 		df[i] = f_right[i] - f_left[i];
-//		f_mid[i] = f_left[i] + 0.5*df[i];
+		f_mid[i] = f_left[i] + 0.5*df[i];
 	}
 
 	min_df = *min_element(df.begin(), df.end());

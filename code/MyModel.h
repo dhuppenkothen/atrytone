@@ -24,6 +24,8 @@ class MyModel
 		// Normalization and slope of the power law background
 		double background;
 		double slope;
+		std::vector<double> e_amp;
+		std::vector<double> e_width;
 
 		// The Gaussian line profiless
 		DNest4::RJObject<MyConditionalPrior> dopplershift;

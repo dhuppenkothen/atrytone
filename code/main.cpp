@@ -15,7 +15,7 @@ int main(int argc, char** argv)
 	std::string datadir = "../data/";
 
 	// get the data filename from the command line
-	Data::get_instance().load_data(datadir.c_str(), "../data/03.pha");;
+	Data::get_instance().load_data(datadir.c_str(), "26.pha");;
 
         cout<<"Loaded FITS files with data ..."<<endl;
 
