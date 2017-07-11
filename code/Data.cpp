@@ -345,8 +345,8 @@ void Data::compute_summaries()
 {
 
 	// ASSUME DATA IS IN KEV!!
-	f_min = 0.25;
-	f_max = 0.754;	
+	f_min = 0.55;//0.25;
+	f_max = 0.7;//0.754;	
 	f_range = f_max - f_min;
 
 	cout<<"Total energy range covered: "<<f_range<<"."<<endl;

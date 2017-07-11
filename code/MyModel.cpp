@@ -5,6 +5,8 @@
 #include <cmath>
 #include <stdexcept>
 #include <gsl/gsl_sf_gamma.h>
+#include <xsFortran.h>
+#include <funcWrappers.h>
 
 using namespace std;
 using namespace DNest4;
@@ -116,11 +118,10 @@ void MyModel::calculate_mu()
 	const vector<double>& f_right = pha.bin_hi;
 	const vector<double>& f_mid = pha.bin_mid;
 
-	//cout<<"f_mid: "<<f_mid<<endl;
 
 	// assign constant background to model
 	mu.assign(mu.size(), 0.0);
-	mu_bkg.assign(mu.size(), 0.0);
+//	mu_bkg.assign(mu.size(), 0.0);
 
 	// get amplitudes and widths from the RJObject 
 	const vector< vector<double> >& dopplershiftcomponents = dopplershift.get_components();
@@ -188,13 +189,35 @@ void MyModel::calculate_mu()
 
 	}
 
+        double *fluxError = new double[mu.size()];
+        double *mu_bkg = new double[mu.size()];
+
+	//fluxError.assign(mu.size(), 0.0);
+	//mu_bkg.assign(mu.size(), 0.0);
+
+	double *energy = new double[mu.size()+1];
+
+	for(size_t i=0.0; i<mu.size()+1; i++)
+		{
+		energy[i] = f_left[i];
+		}
+
+	double *pl_params = new double[2];
+	pl_params[0] = slope;
+	pl_params[1] = background;
+
+
+	energy[mu.size()] = f_right[mu.size()];
+
+        C_powerLaw(energy, mu.size(), pl_params, 0, mu_bkg, fluxError, NULL);
+
         // fold through the ARF
         // code taken from sherpa
         for (size_t ii = 0; ii < mu.size(); ii++ )
 		{ 
 			// power law background
-                        mu_bkg[ ii ] = exp(log(background/(slope + 1.)) + log(f_right[ ii ]) * (slope + 1.))
-                                                 - exp(log(background/(slope + 1.)) + log(f_left[ ii ]) * (slope + 1.));
+//                        mu_bkg[ ii ] = exp(log(background/(slope + 1.)) + log(f_right[ ii ]) * (slope + 1.))
+//                                                 - exp(log(background/(slope + 1.)) + log(f_left[ ii ]) * (slope + 1.));
 
 
 //			for (size_t jj = 0; jj< e_line_pos.size(); jj++)
@@ -210,6 +233,10 @@ void MyModel::calculate_mu()
 
 		}
 
+	delete [] mu_bkg;
+	delete [] energy;
+	delete [] fluxError;
+	delete [] pl_params;
 
 	vector<double> y(mu.size());
         double alpha = exp(-1./noise_L);

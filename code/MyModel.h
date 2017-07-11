@@ -38,7 +38,7 @@ class MyModel
 		// these should probably be long doubles
 		// need to fix that some time!
 		std::vector<double> mu;
-		std::vector<double> mu_bkg;
+		//std::vector<double> mu_bkg;
                 std::vector<double> counts;
 
 //		std::vector<double> mu_small;
