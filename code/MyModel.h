@@ -24,6 +24,7 @@ class MyModel
 		// Normalization and slope of the power law background
 		double background;
 		double slope;
+		double nh;
 		std::vector<double> e_amp;
 		std::vector<double> e_width;
 

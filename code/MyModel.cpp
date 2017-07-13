@@ -116,7 +116,7 @@ void MyModel::calculate_mu()
 
 	const vector<double>& f_left = pha.bin_lo;
 	const vector<double>& f_right = pha.bin_hi;
-	const vector<double>& f_mid = pha.bin_mid;
+	//const vector<double>& f_mid = pha.bin_mid;
 
 
 	// assign constant background to model
@@ -191,7 +191,8 @@ void MyModel::calculate_mu()
 
         double *fluxError = new double[mu.size()];
         double *mu_bkg = new double[mu.size()];
-
+	double *mu_nh = new double[mu.size()];
+	double *fluxError_nh = new double[mu.size()];
 	//fluxError.assign(mu.size(), 0.0);
 	//mu_bkg.assign(mu.size(), 0.0);
 
@@ -209,8 +210,12 @@ void MyModel::calculate_mu()
 
 	energy[mu.size()] = f_right[mu.size()];
 
-        C_powerLaw(energy, mu.size(), pl_params, 0, mu_bkg, fluxError, NULL);
+	double *nh_params = new double[1];
+	nh_params[0] = nh;
 
+        C_powerLaw(energy, mu.size(), pl_params, 0, mu_bkg, fluxError, NULL);
+        C_tbabs(energy, mu.size(), nh_params, 0, mu_nh, fluxError_nh, NULL);
+	
         // fold through the ARF
         // code taken from sherpa
         for (size_t ii = 0; ii < mu.size(); ii++ )
@@ -237,6 +242,9 @@ void MyModel::calculate_mu()
 	delete [] energy;
 	delete [] fluxError;
 	delete [] pl_params;
+	delete [] mu_nh;
+	delete [] fluxError_nh;
+	delete [] nh_params;
 
 	vector<double> y(mu.size());
         double alpha = exp(-1./noise_L);
@@ -304,6 +312,8 @@ void MyModel::from_prior(RNG& rng)
 //
 //
 	slope = -2.0 + 4.0 * rng.rand();
+
+	nh = exp(-15 + (15+log(1e6))*rng.rand());
 	
 	dopplershift.from_prior(rng);
 
@@ -354,7 +364,7 @@ double MyModel::perturb(RNG& rng)
 	}
 	else
 	{
-		which = rng.rand_int(4);
+		which = rng.rand_int(5);
 		if(which == 0)
 		{
             		background = log(background);
@@ -395,8 +405,13 @@ double MyModel::perturb(RNG& rng)
                         slope += 6.*rng.randh();
                         wrap(slope, -3., 3.);
                         }
+                else if(which == 2)
+                        {
+                        nh += (15 + log(1e6))*rng.randh();
+                        wrap(nh, -15, log(1e6));
+                        }
 
-		else if(which == 2)
+		else if(which == 3)
 		{
                         noise_sigma = log(noise_sigma);
                         logH += cauchy.perturb(noise_sigma, rng);
@@ -462,7 +477,7 @@ void MyModel::print(std::ostream& out) const
 	const double& f_min = data.get_f_min();
         const double& f_max = data.get_f_max();
 
-        out<<background<<' '<<slope<<' ';
+        out<<background<<' '<<slope<<' '<<nh<<' ';
 //	for (size_t j=0; j< e_amp.size(); j++)
 //		out<<e_amp[j]<<' ';
 //
